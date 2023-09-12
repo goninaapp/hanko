@@ -16,7 +16,7 @@ type SessionHandler struct {
 func NewSessionHandler(cfg *config.Config, manager session.Manager) *SessionHandler {
 	return &SessionHandler{
 		enableHeader: cfg.Session.EnableAuthTokenHeader,
-		cookieName:   cfg.Session.Cookie.Name + "refresh",
+		cookieName:   cfg.Session.Cookie.Name + "-refresh",
 		manager:      manager,
 	}
 }
