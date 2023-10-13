@@ -65,6 +65,7 @@ func New(config config.Database) (Storage, error) {
 	connectionDetails := &pop.ConnectionDetails{
 		Pool:     5,
 		IdlePool: 0,
+		Options:  make(map[string]string),
 	}
 
 	password := config.Password
@@ -92,6 +93,8 @@ func New(config config.Database) (Storage, error) {
 		if err != nil {
 			panic("authentication error: " + err.Error())
 		}
+
+		connectionDetails.Options["sslmode"] = "require"
 	}
 
 	if len(config.Url) > 0 {
