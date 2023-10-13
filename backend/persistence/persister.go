@@ -1,9 +1,14 @@
 package persistence
 
 import (
+	"context"
 	"embed"
+	"fmt"
+	awsConfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 	"github.com/gobuffalo/pop/v6"
 	"github.com/teamhanko/hanko/backend/config"
+	"os"
 )
 
 //go:embed migrations/*
@@ -41,6 +46,8 @@ type Persister interface {
 	GetTokenPersisterWithConnection(tx *pop.Connection) TokenPersister
 	GetSessionPersister() SessionPersister
 	GetSessionPersisterWithConnection(tx *pop.Connection) SessionPersister
+	Health() error
+	HealthWithConnection(tx *pop.Connection) error
 }
 
 type Migrator interface {
@@ -59,6 +66,34 @@ func New(config config.Database) (Storage, error) {
 		Pool:     5,
 		IdlePool: 0,
 	}
+
+	password := config.Password
+	if password == "AWS.IAM" {
+		cfg, err := awsConfig.LoadDefaultConfig(context.Background())
+		if err != nil {
+			panic("configuration error: " + err.Error())
+		}
+
+		region := os.Getenv("AWS_REGION")
+		if region == "" {
+			region = "eu-central-1"
+		}
+
+		endpoint := fmt.Sprintf("%s:%s", config.Host, config.Port)
+		fmt.Println("endpoint: ", endpoint)
+
+		password, err = auth.BuildAuthToken(
+			context.Background(),
+			endpoint,
+			region,
+			config.User,
+			cfg.Credentials,
+		)
+		if err != nil {
+			panic("authentication error: " + err.Error())
+		}
+	}
+
 	if len(config.Url) > 0 {
 		connectionDetails.URL = config.Url
 	} else {
@@ -67,7 +102,7 @@ func New(config config.Database) (Storage, error) {
 		connectionDetails.Host = config.Host
 		connectionDetails.Port = config.Port
 		connectionDetails.User = config.User
-		connectionDetails.Password = config.Password
+		connectionDetails.Password = password
 	}
 
 	DB, err := pop.NewConnection(connectionDetails)
@@ -213,4 +248,12 @@ func (p *persister) GetSessionPersister() SessionPersister {
 
 func (p *persister) GetSessionPersisterWithConnection(tx *pop.Connection) SessionPersister {
 	return NewSessionPersister(tx)
+}
+
+func (p *persister) Health() error {
+	return p.DB.RawQuery("SELECT 1").Exec()
+}
+
+func (p *persister) HealthWithConnection(tx *pop.Connection) error {
+	return tx.RawQuery("SELECT 1").Exec()
 }

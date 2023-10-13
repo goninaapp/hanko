@@ -40,7 +40,7 @@ func NewAdminRouter(cfg *config.Config, persister persistence.Persister, prometh
 
 	e.GET("/", statusHandler.Status)
 
-	healthHandler := NewHealthHandler()
+	healthHandler := NewHealthHandler(persister)
 
 	health := e.Group("/health")
 	health.GET("/alive", healthHandler.Alive)

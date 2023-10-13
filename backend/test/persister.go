@@ -142,3 +142,11 @@ func (p *persister) GetSessionPersister() persistence.SessionPersister {
 func (p *persister) GetSessionPersisterWithConnection(tx *pop.Connection) persistence.SessionPersister {
 	return p.sessionPersister
 }
+
+func (p *persister) Health() error {
+	return nil
+}
+
+func (p *persister) HealthWithConnection(tx *pop.Connection) error {
+	return nil
+}

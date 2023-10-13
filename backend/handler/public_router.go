@@ -108,7 +108,7 @@ func NewPublicRouter(cfg *config.Config, persister persistence.Persister, promet
 		g.DELETE("/user", userHandler.Delete, sessionMiddleware)
 	}
 
-	healthHandler := NewHealthHandler()
+	healthHandler := NewHealthHandler(persister)
 	webauthnHandler, err := NewWebauthnHandler(cfg, persister, sessionManager, auditLogger)
 	if err != nil {
 		panic(fmt.Errorf("failed to create public webauthn handler: %w", err))
