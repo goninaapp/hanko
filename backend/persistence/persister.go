@@ -9,6 +9,7 @@ import (
 	"github.com/gobuffalo/pop/v6"
 	"github.com/teamhanko/hanko/backend/config"
 	"os"
+	"strings"
 )
 
 //go:embed migrations/*
@@ -93,8 +94,6 @@ func New(config config.Database) (Storage, error) {
 		if err != nil {
 			panic("authentication error: " + err.Error())
 		}
-
-		connectionDetails.Options["sslmode"] = "require"
 	}
 
 	if len(config.Url) > 0 {
@@ -106,6 +105,10 @@ func New(config config.Database) (Storage, error) {
 		connectionDetails.Port = config.Port
 		connectionDetails.User = config.User
 		connectionDetails.Password = password
+	}
+
+	if strings.Contains(config.Host, "rds.amazonaws.com") {
+		connectionDetails.Options["sslmode"] = "require"
 	}
 
 	DB, err := pop.NewConnection(connectionDetails)
