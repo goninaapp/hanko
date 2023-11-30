@@ -161,7 +161,7 @@ func NewPublicRouter(cfg *config.Config, persister persistence.Persister, promet
 	email.POST("/:id/set_primary", emailHandler.SetPrimaryEmail)
 
 	thirdPartyHandler := NewThirdPartyHandler(cfg, persister, sessionManager, auditLogger)
-	thirdparty := g.Group("thirdparty")
+	thirdparty := g.Group("/thirdparty")
 	thirdparty.GET("/auth", thirdPartyHandler.Auth)
 	thirdparty.GET("/callback", thirdPartyHandler.Callback)
 	thirdparty.POST("/callback", thirdPartyHandler.CallbackPost)
