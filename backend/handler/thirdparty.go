@@ -225,7 +225,12 @@ func (h *ThirdPartyHandler) Callback(c echo.Context) error {
 		return h.redirectError(c, code, thirdparty.ErrorServer("could not create audit log").WithCause(err), h.cfg.ThirdParty.ErrorRedirectURL)
 	}
 
-	return c.Redirect(code, successRedirectTo.String())
+	if code == http.StatusNoContent {
+		c.Response().Header().Set("Location", successRedirectTo.String())
+		return c.NoContent(code)
+	} else {
+		return c.Redirect(code, successRedirectTo.String())
+	}
 }
 
 func (h *ThirdPartyHandler) redirectError(c echo.Context, httpCode int, error error, to string) error {
