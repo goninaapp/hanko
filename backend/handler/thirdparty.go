@@ -58,6 +58,8 @@ func (h *ThirdPartyHandler) Auth(c echo.Context) error {
 		return h.redirectError(c, thirdparty.ErrorInvalidRequest(fmt.Sprintf("redirect to '%s' not allowed", request.RedirectTo)), errorRedirectTo)
 	}
 
+	errorRedirectTo = request.RedirectTo
+
 	provider, err := thirdparty.GetProvider(h.cfg.ThirdParty, request.Provider)
 	if err != nil {
 		return h.redirectError(c, thirdparty.ErrorInvalidRequest(err.Error()).WithCause(err), errorRedirectTo)
@@ -82,6 +84,11 @@ func (h *ThirdPartyHandler) Auth(c echo.Context) error {
 	})
 
 	return c.Redirect(http.StatusTemporaryRedirect, authCodeUrl)
+}
+
+func (h *ThirdPartyHandler) Mobile(c echo.Context) error {
+	fmt.Println(c.Request().URL.RawQuery)
+	return c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("gonina://login?%s", c.Request().URL.RawQuery))
 }
 
 func (h *ThirdPartyHandler) CallbackPost(c echo.Context) error {
