@@ -57,12 +57,12 @@ type State struct {
 }
 
 func VerifyState(config *config.Config, state string, expectedState string) (*State, error) {
-	decodedState, err := decodeState(config, state)
+	decodedState, err := DecodeState(config, state)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode state: %w", err)
 	}
 
-	decodedExpectedState, err := decodeState(config, expectedState)
+	decodedExpectedState, err := DecodeState(config, expectedState)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode expectedState: %w", err)
 	}
@@ -78,7 +78,7 @@ func VerifyState(config *config.Config, state string, expectedState string) (*St
 	return decodedState, nil
 }
 
-func decodeState(config *config.Config, state string) (*State, error) {
+func DecodeState(config *config.Config, state string) (*State, error) {
 	aes, err := aes_gcm.NewAESGCM(config.Secrets.Keys)
 	if err != nil {
 		return nil, fmt.Errorf("could not instantiate aesgcm: %w", err)

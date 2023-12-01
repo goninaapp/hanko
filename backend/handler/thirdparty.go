@@ -14,6 +14,7 @@ import (
 	"golang.org/x/oauth2"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 const (
@@ -86,11 +87,6 @@ func (h *ThirdPartyHandler) Auth(c echo.Context) error {
 	return c.Redirect(http.StatusTemporaryRedirect, authCodeUrl)
 }
 
-func (h *ThirdPartyHandler) Mobile(c echo.Context) error {
-	fmt.Println(c.Request().URL.RawQuery)
-	return c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("gonina://login?%s", c.Request().URL.RawQuery))
-}
-
 func (h *ThirdPartyHandler) CallbackPost(c echo.Context) error {
 	q, err := c.FormParams()
 	if err != nil {
@@ -102,7 +98,17 @@ func (h *ThirdPartyHandler) CallbackPost(c echo.Context) error {
 func (h *ThirdPartyHandler) Callback(c echo.Context) error {
 	var successRedirectTo *url.URL
 	var accountLinkingResult *thirdparty.AccountLinkingResult
-	err := h.persister.Transaction(func(tx *pop.Connection) error {
+
+	// Fix so we can use mobile app authentication
+	_, err := c.Cookie(HankoThirdpartyStateCookie)
+	if err != nil {
+		state, err := thirdparty.DecodeState(h.cfg, c.QueryParam("state"))
+		if err == nil && !strings.HasPrefix(state.RedirectTo, "http") {
+			return c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("gonina://login?%s", c.Request().URL.RawQuery))
+		}
+	}
+
+	err = h.persister.Transaction(func(tx *pop.Connection) error {
 		var callback dto.ThirdPartyAuthCallback
 		terr := c.Bind(&callback)
 		if terr != nil {
