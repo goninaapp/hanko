@@ -88,7 +88,12 @@ func (h *ThirdPartyHandler) Auth(c echo.Context) error {
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	return c.Redirect(code, authCodeUrl)
+	if code == http.StatusNoContent {
+		c.Response().Header().Set("Location", authCodeUrl)
+		return c.NoContent(code)
+	} else {
+		return c.Redirect(code, authCodeUrl)
+	}
 }
 
 func (h *ThirdPartyHandler) CallbackPost(c echo.Context) error {
@@ -235,7 +240,13 @@ func (h *ThirdPartyHandler) redirectError(c echo.Context, httpCode int, error er
 	}
 
 	redirectURL := thirdparty.GetErrorUrl(redirectTo, error)
-	return c.Redirect(httpCode, redirectURL)
+
+	if httpCode == http.StatusNoContent {
+		c.Response().Header().Set("Location", redirectURL)
+		return c.NoContent(httpCode)
+	} else {
+		return c.Redirect(httpCode, redirectURL)
+	}
 }
 
 func (h *ThirdPartyHandler) auditError(c echo.Context, err error) error {
