@@ -14,7 +14,6 @@ import (
 	"golang.org/x/oauth2"
 	"net/http"
 	"net/url"
-	"strings"
 )
 
 const (
@@ -47,32 +46,28 @@ func (h *ThirdPartyHandler) Auth(c echo.Context) error {
 	var request dto.ThirdPartyAuthRequest
 	err := c.Bind(&request)
 	if err != nil {
-		return h.redirectError(c, http.StatusTemporaryRedirect, thirdparty.ErrorServer("could not decode request payload").WithCause(err), errorRedirectTo)
+		return h.redirectError(c, thirdparty.ErrorServer("could not decode request payload").WithCause(err), errorRedirectTo)
 	}
 
 	err = c.Validate(request)
 	if err != nil {
-		return h.redirectError(c, http.StatusTemporaryRedirect, thirdparty.ErrorInvalidRequest(err.Error()).WithCause(err), errorRedirectTo)
+		return h.redirectError(c, thirdparty.ErrorInvalidRequest(err.Error()).WithCause(err), errorRedirectTo)
 	}
 
 	if ok := thirdparty.IsAllowedRedirect(h.cfg.ThirdParty, request.RedirectTo); !ok {
-		return h.redirectError(c, http.StatusTemporaryRedirect, thirdparty.ErrorInvalidRequest(fmt.Sprintf("redirect to '%s' not allowed", request.RedirectTo)), errorRedirectTo)
+		return h.redirectError(c, thirdparty.ErrorInvalidRequest(fmt.Sprintf("redirect to '%s' not allowed", request.RedirectTo)), errorRedirectTo)
 	}
 
 	errorRedirectTo = request.RedirectTo
-	code := http.StatusTemporaryRedirect
-	if !strings.HasPrefix(request.RedirectTo, "http") {
-		code = http.StatusNoContent
-	}
 
 	provider, err := thirdparty.GetProvider(h.cfg.ThirdParty, request.Provider)
 	if err != nil {
-		return h.redirectError(c, code, thirdparty.ErrorInvalidRequest(err.Error()).WithCause(err), errorRedirectTo)
+		return h.redirectError(c, thirdparty.ErrorInvalidRequest(err.Error()).WithCause(err), errorRedirectTo)
 	}
 
 	state, err := thirdparty.GenerateState(h.cfg, provider.Name(), request.RedirectTo)
 	if err != nil {
-		return h.redirectError(c, code, thirdparty.ErrorServer("could not generate state").WithCause(err), errorRedirectTo)
+		return h.redirectError(c, thirdparty.ErrorServer("could not generate state").WithCause(err), errorRedirectTo)
 	}
 
 	authCodeUrl := provider.AuthCodeURL(string(state), oauth2.SetAuthURLParam("prompt", "consent"))
@@ -88,41 +83,23 @@ func (h *ThirdPartyHandler) Auth(c echo.Context) error {
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	if code == http.StatusNoContent {
-		c.Response().Header().Set("Location", authCodeUrl)
-		return c.NoContent(code)
-	} else {
-		return c.Redirect(code, authCodeUrl)
-	}
+	return c.Redirect(http.StatusTemporaryRedirect, authCodeUrl)
 }
 
 func (h *ThirdPartyHandler) CallbackPost(c echo.Context) error {
 	q, err := c.FormParams()
 	if err != nil {
-		return h.redirectError(c, http.StatusTemporaryRedirect, thirdparty.ErrorServer("could not get form parameters"), h.cfg.ThirdParty.ErrorRedirectURL)
+		return h.redirectError(c, thirdparty.ErrorServer("could not get form parameters"), h.cfg.ThirdParty.ErrorRedirectURL)
 	}
 	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/thirdparty/callback?%s", q.Encode()))
 }
 
 func (h *ThirdPartyHandler) Callback(c echo.Context) error {
-	var successRedirectTo *url.URL
+	var successRedirectTo string
 	var accountLinkingResult *thirdparty.AccountLinkingResult
+	errorRedirectTo := h.cfg.ThirdParty.ErrorRedirectURL
 
-	// Fix so we can use mobile app authentication
-	_, err := c.Cookie(HankoThirdpartyStateCookie)
-	if err != nil {
-		state, err := thirdparty.DecodeState(h.cfg, c.QueryParam("state"))
-		if err == nil && !strings.HasPrefix(state.RedirectTo, "http") {
-			return c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("gonina://login?%s", c.Request().URL.RawQuery))
-		}
-	}
-
-	code := http.StatusTemporaryRedirect
-	if c.QueryParam("no_follow") == "true" {
-		code = http.StatusNoContent
-	}
-
-	err = h.persister.Transaction(func(tx *pop.Connection) error {
+	err := h.persister.Transaction(func(tx *pop.Connection) error {
 		var callback dto.ThirdPartyAuthCallback
 		terr := c.Bind(&callback)
 		if terr != nil {
@@ -142,14 +119,33 @@ func (h *ThirdPartyHandler) Callback(c echo.Context) error {
 			}
 		}
 
+		state, terr := thirdparty.DecodeState(h.cfg, callback.State)
+		if terr != nil {
+			return thirdparty.ErrorInvalidRequest(terr.Error()).WithCause(terr)
+		}
+
+		redirectTo, terr := url.Parse(state.RedirectTo)
+		if terr != nil {
+			return thirdparty.ErrorServer("could not parse redirect url").WithCause(terr)
+		}
+
+		eRedirectTo, _ := url.Parse(redirectTo.String())
+		eRedirectTo.RawQuery = ""
+		errorRedirectTo = eRedirectTo.String()
+
 		expectedState, terr := c.Cookie(HankoThirdpartyStateCookie)
 		if terr != nil {
+
 			return thirdparty.ErrorInvalidRequest("thirdparty state cookie is missing")
 		}
 
-		state, terr := thirdparty.VerifyState(h.cfg, callback.State, expectedState.Value)
+		cookieState, terr := thirdparty.DecodeState(h.cfg, expectedState.Value)
 		if terr != nil {
 			return thirdparty.ErrorInvalidRequest(terr.Error()).WithCause(terr)
+		}
+
+		if cookieState.Nonce != state.Nonce {
+			return thirdparty.ErrorInvalidRequest("nonce mismatch")
 		}
 
 		if callback.HasError() {
@@ -191,15 +187,10 @@ func (h *ThirdPartyHandler) Callback(c echo.Context) error {
 			return thirdparty.ErrorServer("could not save token to db").WithCause(terr)
 		}
 
-		redirectTo, terr := url.Parse(state.RedirectTo)
-		if terr != nil {
-			return thirdparty.ErrorServer("could not parse redirect url").WithCause(terr)
-		}
-
 		query := redirectTo.Query()
 		query.Add(HankoTokenQuery, token.Value)
 		redirectTo.RawQuery = query.Encode()
-		successRedirectTo = redirectTo
+		successRedirectTo = redirectTo.String()
 
 		c.SetCookie(&http.Cookie{
 			Name:     HankoThirdpartyStateCookie,
@@ -216,24 +207,19 @@ func (h *ThirdPartyHandler) Callback(c echo.Context) error {
 	})
 
 	if err != nil {
-		return h.redirectError(c, code, err, h.cfg.ThirdParty.ErrorRedirectURL)
+		return h.redirectError(c, err, errorRedirectTo)
 	}
 
 	err = h.auditLogger.Create(c, accountLinkingResult.Type, accountLinkingResult.User, nil)
 
 	if err != nil {
-		return h.redirectError(c, code, thirdparty.ErrorServer("could not create audit log").WithCause(err), h.cfg.ThirdParty.ErrorRedirectURL)
+		return h.redirectError(c, thirdparty.ErrorServer("could not create audit log").WithCause(err), errorRedirectTo)
 	}
 
-	if code == http.StatusNoContent {
-		c.Response().Header().Set("Location", successRedirectTo.String())
-		return c.NoContent(code)
-	} else {
-		return c.Redirect(code, successRedirectTo.String())
-	}
+	return c.Redirect(http.StatusTemporaryRedirect, successRedirectTo)
 }
 
-func (h *ThirdPartyHandler) redirectError(c echo.Context, httpCode int, error error, to string) error {
+func (h *ThirdPartyHandler) redirectError(c echo.Context, error error, to string) error {
 	redirectTo := h.cfg.ThirdParty.ErrorRedirectURL
 	if to != "" {
 		redirectTo = to
@@ -246,12 +232,7 @@ func (h *ThirdPartyHandler) redirectError(c echo.Context, httpCode int, error er
 
 	redirectURL := thirdparty.GetErrorUrl(redirectTo, error)
 
-	if httpCode == http.StatusNoContent {
-		c.Response().Header().Set("Location", redirectURL)
-		return c.NoContent(httpCode)
-	} else {
-		return c.Redirect(httpCode, redirectURL)
-	}
+	return c.Redirect(http.StatusTemporaryRedirect, redirectURL)
 }
 
 func (h *ThirdPartyHandler) auditError(c echo.Context, err error) error {
