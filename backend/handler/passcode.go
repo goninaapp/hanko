@@ -35,6 +35,8 @@ type PasscodeHandler struct {
 	cfg               *config.Config
 	auditLogger       auditlog.Logger
 	rateLimiter       limiter.Store
+	exclusionEmail    string
+	exclusionCode     string
 }
 
 var maxPasscodeTries = 3
@@ -60,6 +62,8 @@ func NewPasscodeHandler(cfg *config.Config, persister persistence.Persister, ses
 		cfg:               cfg,
 		auditLogger:       auditLogger,
 		rateLimiter:       rateLimiter,
+		exclusionEmail:    cfg.Passcode.ExclusionEmail,
+		exclusionCode:     cfg.Passcode.ExclusionCode,
 	}, nil
 }
 
@@ -152,6 +156,11 @@ func (h *PasscodeHandler) Init(c echo.Context) error {
 	passcode, err := h.passcodeGenerator.Generate()
 	if err != nil {
 		return fmt.Errorf("failed to generate passcode: %w", err)
+	}
+
+	// Adds possibility to override (e.g. for Apple Reviews)
+	if h.exclusionEmail != "" && h.exclusionCode != "" && h.exclusionEmail == email.Address {
+		passcode = h.exclusionCode
 	}
 
 	passcodeId, err := uuid.NewV4()
