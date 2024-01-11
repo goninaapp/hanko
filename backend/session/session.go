@@ -159,6 +159,7 @@ func (m *manager) GenerateRefreshCookie(sessionId string) (*http.Cookie, error) 
 		Secure:   m.cookieConfig.Secure,
 		HttpOnly: m.cookieConfig.HttpOnly,
 		SameSite: m.cookieConfig.SameSite,
+		MaxAge:   365 * 24 * 60 * 60, // 1 year
 	}, nil
 }
 
