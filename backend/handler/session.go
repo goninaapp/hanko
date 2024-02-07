@@ -5,6 +5,7 @@ import (
 	"github.com/teamhanko/hanko/backend/config"
 	"github.com/teamhanko/hanko/backend/session"
 	"net/http"
+	"strings"
 )
 
 type SessionHandler struct {
@@ -23,12 +24,14 @@ func NewSessionHandler(cfg *config.Config, manager session.Manager) *SessionHand
 
 func (handler *SessionHandler) ExchangeRefreshToken(c echo.Context) error {
 	token := ""
-	if handler.enableHeader {
-		token = c.Request().Header.Get("X-Refresh-Token")
+
+	header := c.Request().Header.Get("Authorization")
+	if strings.HasPrefix(header, "Bearer ") {
+		token = strings.TrimPrefix(header, "Bearer ")
 	} else {
-		c, _ := c.Cookie(handler.cookieName)
-		if c != nil {
-			token = c.Value
+		cookie, _ := c.Cookie(handler.cookieName)
+		if cookie != nil {
+			token = cookie.Value
 		}
 	}
 
