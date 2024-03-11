@@ -91,7 +91,14 @@ func (h *ThirdPartyHandler) CallbackPost(c echo.Context) error {
 	if err != nil {
 		return h.redirectError(c, thirdparty.ErrorServer("could not get form parameters"), h.cfg.ThirdParty.ErrorRedirectURL)
 	}
-	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/thirdparty/callback?%s", q.Encode()))
+
+	path := fmt.Sprintf("/thirdparty/callback?%s", q.Encode())
+	pathPrefix := h.cfg.Server.Public.PathPrefix
+	if len(pathPrefix) > 0 {
+		path = pathPrefix + path
+	}
+
+	return c.Redirect(http.StatusSeeOther, path)
 }
 
 func (h *ThirdPartyHandler) Callback(c echo.Context) error {
