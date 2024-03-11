@@ -3,6 +3,7 @@ package thirdparty
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/teamhanko/hanko/backend/config"
@@ -88,13 +89,16 @@ func (a appleProvider) GetUserData(token *oauth2.Token) (*UserData, error) {
 	}
 
 	var emailVerified bool
-	if emailVerifiedRaw, ok := parsedIDToken.PrivateClaims()["email_verified"].(string); !ok {
-		return nil, errors.New("email_verified claim expected to be of type string")
-	} else {
+	if emailVerifiedRaw, ok := parsedIDToken.PrivateClaims()["email_verified"].(string); ok {
 		emailVerified, err = strconv.ParseBool(emailVerifiedRaw)
 		if err != nil {
 			return nil, errors.New("cannot parse email_verified claim as bool")
 		}
+	} else if emailVerifiedBooleanRaw, ok := parsedIDToken.PrivateClaims()["email_verified"].(bool); ok {
+		emailVerified = emailVerifiedBooleanRaw
+	} else {
+		fmt.Println(parsedIDToken.PrivateClaims())
+		return nil, errors.New("email_verified claim expected to be of type string or bool")
 	}
 
 	userData := &UserData{
