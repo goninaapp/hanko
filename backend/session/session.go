@@ -214,12 +214,18 @@ func (m *manager) ExchangeRefreshToken(id string, e echo.Context) error {
 		return errors.New("session not found")
 	}
 
-	err = m.persister.Delete(id)
+	if sess.Used {
+		return errors.New("session already used")
+	}
+
+	sess.Used = true
+
+	err = m.GenerateCookieOrHeader(sess.UserID, e)
 	if err != nil {
 		return err
 	}
 
-	return m.GenerateCookieOrHeader(sess.UserID, e)
+	return m.persister.Update(sess)
 }
 
 // DeleteCookie returns a cookie that will expire the cookie on the frontend
@@ -238,6 +244,19 @@ func (m *manager) DeleteCookie(e echo.Context) error {
 		SameSite: m.cookieConfig.SameSite,
 		MaxAge:   -1,
 	})
+
+	if m.enableRefreshToken {
+		e.SetCookie(&http.Cookie{
+			Name:     m.cookieConfig.Name + "-refresh",
+			Value:    "",
+			Domain:   m.cookieConfig.Domain,
+			Path:     m.refreshTokenPath,
+			Secure:   m.cookieConfig.Secure,
+			HttpOnly: m.cookieConfig.HttpOnly,
+			SameSite: m.cookieConfig.SameSite,
+			MaxAge:   -1,
+		})
+	}
 
 	return nil
 }

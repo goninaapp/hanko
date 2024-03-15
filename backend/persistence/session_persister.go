@@ -9,6 +9,7 @@ import (
 type SessionPersister interface {
 	Create(session models.Session) error
 	Get(id string) (*models.Session, error)
+	Update(session *models.Session) error
 	Delete(id string) error
 }
 
@@ -41,6 +42,19 @@ func (p *sessionPersister) Get(id string) (*models.Session, error) {
 	}
 
 	return session, nil
+}
+
+func (p *sessionPersister) Update(session *models.Session) error {
+	vErr, err := p.db.ValidateAndSave(session)
+	if err != nil {
+		return err
+	}
+
+	if vErr != nil && vErr.HasAny() {
+		return fmt.Errorf("primary session object validation failed: %w", vErr)
+	}
+
+	return nil
 }
 
 func (p *sessionPersister) Delete(id string) error {
