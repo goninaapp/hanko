@@ -40,23 +40,6 @@ func (handler *SessionHandler) ExchangeRefreshToken(c echo.Context) error {
 	}
 
 	if token == "" {
-		if hub != nil {
-			hub.WithScope(func(scope *sentry.Scope) {
-				scope.AddBreadcrumb(&sentry.Breadcrumb{
-					Category: "auth",
-					Message:  "failed to find refresh token",
-					Level:    sentry.LevelError,
-					Data: map[string]interface{}{
-						"headers": c.Request().Header,
-						"cookies": c.Request().Cookies(),
-					},
-					Timestamp: time.Now(),
-				}, 5)
-
-				hub.CaptureMessage("missing refresh token")
-			})
-		}
-
 		return echo.NewHTTPError(http.StatusUnauthorized, "missing refresh token")
 	}
 
