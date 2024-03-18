@@ -7,7 +7,7 @@ import (
 )
 
 type SessionPersister interface {
-	Create(session models.Session) error
+	Create(session *models.Session) error
 	Get(id string) (*models.Session, error)
 	Update(session *models.Session) error
 	Delete(id string) error
@@ -21,8 +21,8 @@ func NewSessionPersister(db *pop.Connection) SessionPersister {
 	return &sessionPersister{db: db}
 }
 
-func (p *sessionPersister) Create(session models.Session) error {
-	vErr, err := p.db.ValidateAndCreate(&session)
+func (p *sessionPersister) Create(session *models.Session) error {
+	vErr, err := p.db.ValidateAndCreate(session)
 	if err != nil {
 		return err
 	}

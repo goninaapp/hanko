@@ -188,7 +188,7 @@ func (m *manager) GenerateCookieOrHeader(userId uuid.UUID, e echo.Context) error
 		return err
 	}
 
-	err = m.persister.Create(*session)
+	err = m.persister.Create(session)
 	if err != nil {
 		return err
 	}

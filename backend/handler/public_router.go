@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	sentryecho "github.com/getsentry/sentry-go/echo"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/sethvargo/go-limiter/httplimit"
@@ -49,6 +50,8 @@ func NewPublicRouter(cfg *config.Config, persister persistence.Persister, promet
 	if cfg.Session.EnableRefreshToken && cfg.Session.EnableAuthTokenHeader {
 		exposeHeader = append(exposeHeader, "X-Refresh-Token")
 	}
+
+	e.Use(sentryecho.New(sentryecho.Options{}))
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		UnsafeWildcardOriginWithAllowCredentials: cfg.Server.Public.Cors.UnsafeWildcardOriginAllowed,
