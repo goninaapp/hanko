@@ -214,9 +214,11 @@ func (m *manager) ExchangeRefreshToken(id string, e echo.Context) error {
 		return errors.New("session not found")
 	}
 
-	if sess.Used {
-		return errors.New("session already used")
-	}
+	/*
+		if sess.Used {
+			return errors.New("session already used")
+		}
+	*/
 
 	sess.Used = true
 
