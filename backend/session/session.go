@@ -3,6 +3,8 @@ package session
 import (
 	"errors"
 	"fmt"
+	"github.com/getsentry/sentry-go"
+	sentryecho "github.com/getsentry/sentry-go/echo"
 	"github.com/gofrs/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -214,11 +216,25 @@ func (m *manager) ExchangeRefreshToken(id string, e echo.Context) error {
 		return errors.New("session not found")
 	}
 
-	/*
-		if sess.Used {
-			return errors.New("session already used")
-		}
-	*/
+	hub := sentryecho.GetHubFromContext(e)
+	if sess.Used && hub != nil {
+		hub.WithScope(func(scope *sentry.Scope) {
+			scope.AddBreadcrumb(&sentry.Breadcrumb{
+				Category: "auth",
+				Message:  "failed exchange refresh token",
+				Level:    sentry.LevelError,
+				Data: map[string]interface{}{
+					"session_id": id,
+					"used_count": sess.UsedCount,
+					"user_id":    sess.UserID,
+					"error":      "session already used",
+				},
+				Timestamp: time.Now(),
+			}, 5)
+
+			hub.CaptureMessage("session already used")
+		})
+	}
 
 	sess.Used = true
 	sess.UsedCount++
