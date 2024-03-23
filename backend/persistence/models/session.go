@@ -15,6 +15,7 @@ type Session struct {
 	ID        string    `db:"id"`
 	UserID    uuid.UUID `db:"user_id"`
 	Used      bool      `db:"used"`
+	UsedCount int       `db:"used_count"`
 	CreatedAt time.Time `db:"created_at"`
 	UpdatedAt time.Time `db:"updated_at"`
 }
@@ -36,6 +37,7 @@ func NewSession(userID uuid.UUID) (*Session, error) {
 		ID:        key,
 		UserID:    userID,
 		Used:      false,
+		UsedCount: 0,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil

@@ -221,6 +221,7 @@ func (m *manager) ExchangeRefreshToken(id string, e echo.Context) error {
 	*/
 
 	sess.Used = true
+	sess.UsedCount++
 
 	err = m.GenerateCookieOrHeader(sess.UserID, e)
 	if err != nil {
